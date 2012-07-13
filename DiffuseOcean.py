@@ -26,8 +26,12 @@ class DiffuseOcean:
     ncp = nc.Dataset(self.pismfile,'r')
     self.topg = ncp.variables['topg'][0,:,:]
     self.thk  = ncp.variables['thk'][0,:,:]
-    self.temp_all = nci.variables['thetao'][:,:,:]
-    self.salt_all = nci.variables['salinity'][:,:,:]
+    self.temp_all = ma.masked_array(nci.variables['thetao'][:,:,:])
+    self.salt_all = ma.masked_array(nci.variables['salinity'][:,:,:])
+    self.temp_all[self.temp_all >  500.] = ma.masked
+    self.temp_all[self.temp_all <= 500.] = ma.masked
+    self.salt_all[self.salt_all > 500.] = ma.masked
+    self.salt_all[self.salt_all <= 500.] = ma.masked
     self.time = nci.variables['time'][:]
     self.x = nci.variables['x'][:]
     self.y = nci.variables['y'][:]
@@ -122,7 +126,7 @@ class DiffuseOcean:
         ui = u
         m += 1
       self.salt_out[t,:,:] = u
-
+    self.notmask = notmask
   def writeNetcdf(self):
     ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
     ncout.createDimension('time',size=None)
@@ -140,7 +144,13 @@ class DiffuseOcean:
     nclat = ncout.createVariable( 'lat','float32',('y','x') )
     ncthk = ncout.createVariable( 'thk','float32',('y','x') )
     nctg  = ncout.createVariable( 'topg','float32',('y','x') )
-
+    ncx1  = ncout.createVariable( 'abovesea1','float32',('y','x') )
+    ncx2  = ncout.createVariable( 'abovesea2','float32',('y','x') )
+    ncx3  = ncout.createVariable( 'abovesea3','float32',('y','x') )
+    ncx4  = ncout.createVariable( 'abovesea4','float32',('y','x') )
+    ncx5  = ncout.createVariable( 'neighboursbelowmask','float32',('y','x') )
+    ncx6  = ncout.createVariable( 'neighboursbelow','float32',('y','x') )
+    ncx7  = ncout.createVariable( 'notmask','float32',('y','x') )
     nct[:]     = self.time
     ncvart[:]  = self.temp_out
     ncvars[:]  = self.salt_out
@@ -149,7 +159,13 @@ class DiffuseOcean:
     ncy[:]     = self.y
     ncthk[:]    = self.thk
     nctg[:]     = self.topg
-
+    ncx1[:]     = self.abovesea1
+    ncx2[:]     = self.abovesea2
+    ncx3[:]     = self.abovesea3
+    ncx4[:]     = self.abovesea4
+    ncx5[:]     = self.neighboursbelowmask
+    ncx6[:]     = self.neighboursbelow
+    ncx7[:]     = self.notmask
     ncy.units = 'meters'
     ncx.units = 'meters'
     ncvart.units = 'Kelvin'
