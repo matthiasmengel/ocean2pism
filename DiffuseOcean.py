@@ -30,13 +30,12 @@ class DiffuseOcean:
     self.olat = nci.variables['lat'][:,0]
     # take out last 3 longitude values, its double data
     self.olon = nci.variables['lon'][0,0:-3]
-    print nci.variables["thetao"][:].shape
     self.otemp = ma.array(nci.variables["thetao"][:,:,0:-3])
     self.osalt = ma.array(nci.variables["salinity"][:,:,0:-3])
-    self.otemp[self.otemp<-500.] = ma.masked
-    self.otemp[self.otemp>500. ] = ma.masked
-    self.osalt[self.osalt<0.   ] = ma.masked
-    self.osalt[self.osalt>50.  ] = ma.masked
+    self.otemp[self.otemp< -500. ] = ma.masked
+    self.otemp[self.otemp>  500. ] = ma.masked
+    self.osalt[self.osalt< -500. ] = ma.masked
+    self.osalt[self.osalt>  500. ] = ma.masked
     self.time = nci.variables['time'][:]
     self.x = ncp.variables['x'][:]
     self.y = ncp.variables['y'][:]
@@ -66,25 +65,11 @@ class DiffuseOcean:
     self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     
-    for t in np.arange(0,len(self.time)):
+    for t in np.arange(0,2):#len(self.time)):
       print "project timestep" + str(t)
       self.projtemp[t,:,:] = extend_interp(self.otemp[t,:,:])
       self.projsalt[t,:,:] = extend_interp(self.osalt[t,:,:])
-      
-      #otempslice     = self.otemp[t,:,:]
-      #otempslice_ext = ma.concatenate([ma.column_stack(southernlimitmask), otempslice], 0)
-      #self.projtemp[t,:,:] = interp(otempslice_ext, self.olon, olat_ext, pismlon, pismlat)
-    ###osalt_ext = ma.concatenate([ma.column_stack(southernlimitmask), briossalt], 0)
-    #xgrid, ygrid = np.meshgrid(pism.variables['y'][:],pism.variables['y'][:])
-    ## create projection and new lons and lats that are needed for interpolation
-    #newprojection  = Proj(proj='stere',lat_0=-90,lon_0=0,lat_ts=-71,ellps='WGS84')
-    ## these should be the same as the lon lat variables in Le Brocq
-    #pismlon, pismlat = newprojection(xgrid,ygrid,inverse=True)
-
-    #projvart      = interp(briostemp_ext, brioslon, brioslat_ext, pismlon, pismlat)
-    #projvars      = interp(briossalt_ext, brioslon, brioslat_ext, pismlon, pismlat)
-
-
+    
   def findAboveAndBelowSea(self):
     belowsea = self.topg <= 0.
     abovesea = self.topg >  0.
@@ -108,65 +93,86 @@ class DiffuseOcean:
 
   def runDiffusion(self):
   
-    def evolve_ts2(ui, uii):
-      """ This function uses a numpy expression to evaluate the derivatives
-          in the Laplacian, and calculates u[i,j] based on ui[i,j]. """
-      # diffusion
-      u[1:-1, 1:-1] = ui[1:-1, 1:-1] + self.a*self.dt*( (ui[2:, 1:-1] -
-        2*ui[1:-1, 1:-1] + ui[:-2, 1:-1])/self.dx2 + (ui[1:-1, 2:] -
-        2*ui[1:-1, 1:-1] + ui[1:-1, :-2])/self.dy2 )
-      # set known brios values back to initial
-      u[notmask] = uii[notmask]
-      # set values with topg>0 that are adjacent topg<0 cells
-      # to the mean value of these topg<0 neighbours
-      ud[1:-1, 1:-1] = ((ui[ :-2,  1:-1] *self.abovesea1[1:-1, 1:-1] +
-                          ui[2:,   1:-1] *self.abovesea2[1:-1, 1:-1] +
-                          ui[1:-1,  :-2] *self.abovesea3[1:-1, 1:-1] +
-                          ui[1:-1, 2:]   *self.abovesea4[1:-1, 1:-1]) /
-                        self.neighboursbelow[1:-1, 1:-1] )
-      u[self.neighboursbelowmask] = ud[self.neighboursbelowmask]
-      return u
-
-    self.temp_out    = np.copy(self.temp_all)
-    self.temp_out[:] = 0.   
-    #temp_outraw = np.copy(temp_out)
-    self.salt_out    = np.copy(self.temp_out)
-
-    print "start diffusion\n"
-    for t in np.arange(0,self.temp_all.shape[0]):
-      print "timestep" + str(t)+ "\n"
-      uii = ma.copy(self.temp_all[t,:,:])
-      ui  = np.copy(self.temp_all[t,:,:]) # get rid of mask
-      notmask = ~uii.mask
-      ui[ui>500.]  = 273.15 -2.
-      ui[ui<-500.] = 273.15 -2.
+    def run_diffuse(dfield, setmissval):
+      
+      def diffuse(ui, uii):
+        """ This function uses a numpy expression to evaluate the derivatives
+            in the Laplacian, and calculates u[i,j] based on ui[i,j]. """
+        # diffusion
+        u[1:-1, 1:-1] = ui[1:-1, 1:-1] + self.a*self.dt*( (ui[2:, 1:-1] -
+          2*ui[1:-1, 1:-1] + ui[:-2, 1:-1])/self.dx2 + (ui[1:-1, 2:] -
+          2*ui[1:-1, 1:-1] + ui[1:-1, :-2])/self.dy2 )
+        # set known brios values back to initial
+        u[notmask] = uii[notmask]
+        # set values with topg>0 that are adjacent topg<0 cells
+        # to the mean value of these topg<0 neighbours
+        ud[1:-1, 1:-1] = ((ui[ :-2,  1:-1] *self.abovesea1[1:-1, 1:-1] +
+                            ui[2:,   1:-1] *self.abovesea2[1:-1, 1:-1] +
+                            ui[1:-1,  :-2] *self.abovesea3[1:-1, 1:-1] +
+                            ui[1:-1, 2:]   *self.abovesea4[1:-1, 1:-1]) /
+                          self.neighboursbelow[1:-1, 1:-1] )
+        u[self.neighboursbelowmask] = ud[self.neighboursbelowmask]
+        return u
+      
+      uii = ma.copy(dfield)
+      ui  = np.copy(dfield) # get rid of mask
+      ui[ui>  500.] = setmissval
+      ui[ui< -500.] = setmissval
       u   = np.copy(ui)
       ud  = np.zeros(ui.shape)
-      m=0
-      while m < self.timesteps:
-        print "Computing temp for m =" + str(m) + "\n"
-        u  = evolve_ts2(ui, uii)
-        ui = u
-        m += 1
-      self.temp_out[t,:,:] = u
-      #temp_outraw[t,:,:] = uii
-
-      uii = ma.copy(self.salt_all[t,:,:])
-      ui  = np.copy(self.salt_all[t,:,:])  # get rid of mask
       notmask = ~uii.mask
-      ui[ui>500.] = 34.8
-      ui[ui<-500.] = 34.8
-      u    = np.copy(ui)
-      ud   = np.zeros(ui.shape)
-      print "start salinity"
+      self.notmask = notmask
       m=0
       while m < self.timesteps:
-        print "Computing salt for m =" + str(m) + "\n"
-        u  = evolve_ts2(ui, uii)
+        print "Diffuse for m =" + str(m) + "\n"
+        u  = diffuse(ui, uii)
         ui = u
         m += 1
-      self.salt_out[t,:,:] = u
-    self.notmask = notmask
+      return u
+      
+    self.dfutemp    = np.copy(self.projtemp)
+    self.dfutemp[:] = 0.
+    #temp_outraw = np.copy(temp_out)
+    self.dfusalt    = np.copy(self.dfutemp)
+
+    print "start diffusion\n"
+    for t in np.arange(0,1):#self.projtemp.shape[0]):
+      print "diffuse timestep " + str(t)+ "\n"
+      self.dfutemp[t,:,:] = run_diffuse(self.projtemp[t,:,:],273.15 -2.0)
+      self.dfusalt[t,:,:] = run_diffuse(self.projsalt[t,:,:],34.8)
+      
+      #uii = ma.copy(self.temp_all[t,:,:])
+      #ui  = np.copy(self.temp_all[t,:,:]) # get rid of mask
+      #notmask = ~uii.mask
+      #ui[ui>500.]  = 273.15 -2.
+      #ui[ui<500.] = 273.15 -2.
+      #u   = np.copy(ui)
+      #ud  = np.zeros(ui.shape)
+      #m=0
+      #while m < self.timesteps:
+        #print "Computing temp for m =" + str(m) + "\n"
+        #u  = diffuse(ui, uii)
+        #ui = u
+        #m += 1
+      #self.temp_out[t,:,:] = u
+      ##temp_outraw[t,:,:] = uii
+
+      #uii = ma.copy(self.salt_all[t,:,:])
+      #ui  = np.copy(self.salt_all[t,:,:])  # get rid of mask
+      #notmask = ~uii.mask
+      #ui[ui>500.] = 34.8
+      #ui[ui<-500.] = 34.8
+      #u    = np.copy(ui)
+      #ud   = np.zeros(ui.shape)
+      #print "start salinity"
+      #m=0
+      #while m < self.timesteps:
+        #print "Computing salt for m =" + str(m) + "\n"
+        #u  = diffuse(ui, uii)
+        #ui = u
+        #m += 1
+      #self.salt_out[t,:,:] = u
+    #self.notmask = notmask
     
   def writeNetcdf(self):
     ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
@@ -193,9 +199,9 @@ class DiffuseOcean:
     ncx6  = ncout.createVariable( 'neighboursbelow','float32',('y','x') )
     ncx7  = ncout.createVariable( 'notmask','float32',('y','x') )
     nct[:]     = self.time
-    ncvart[:]  = self.temp_out
-    ncvars[:]  = self.salt_out
-    ncvartr[:] = self.temp_all
+    ncvart[:]  = self.dfutemp
+    ncvars[:]  = self.dfusalt
+    ncvartr[:] = self.projtemp
     ncx[:]     = self.x
     ncy[:]     = self.y
     ncthk[:]    = self.thk
