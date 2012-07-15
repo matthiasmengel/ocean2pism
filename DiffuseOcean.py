@@ -1,9 +1,10 @@
 
-import os
+import os, time
 import netCDF4 as nc
 import numpy as np
 import numpy.ma as ma
-import time
+from mpl_toolkits.basemap import interp
+from pyproj import Proj
 
 class DiffuseOcean:
   """A class to diffuse Ocean Data over land where topg < 0.
@@ -26,15 +27,19 @@ class DiffuseOcean:
     ncp = nc.Dataset(self.pismfile,'r')
     self.topg = ncp.variables['topg'][0,:,:]
     self.thk  = ncp.variables['thk'][0,:,:]
-    self.temp_all = ma.masked_array(nci.variables['thetao'][:,:,:])
-    self.salt_all = ma.masked_array(nci.variables['salinity'][:,:,:])
-    self.temp_all[self.temp_all >  500.] = ma.masked
-    self.temp_all[self.temp_all <= 500.] = ma.masked
-    self.salt_all[self.salt_all > 500.] = ma.masked
-    self.salt_all[self.salt_all <= 500.] = ma.masked
+    self.olat = nci.variables['lat'][:,0]
+    # take out last 3 longitude values, its double data
+    self.olon = nci.variables['lon'][0,0:-3]
+    print nci.variables["thetao"][:].shape
+    self.otemp = ma.array(nci.variables["thetao"][:,:,0:-3])
+    self.osalt = ma.array(nci.variables["salinity"][:,:,0:-3])
+    self.otemp[self.otemp<-500.] = ma.masked
+    self.otemp[self.otemp>500. ] = ma.masked
+    self.osalt[self.osalt<0.   ] = ma.masked
+    self.osalt[self.osalt>50.  ] = ma.masked
     self.time = nci.variables['time'][:]
-    self.x = nci.variables['x'][:]
-    self.y = nci.variables['y'][:]
+    self.x = ncp.variables['x'][:]
+    self.y = ncp.variables['y'][:]
     dx = self.x[1]-self.x[0]
     dy = self.y[1]-self.y[0]
     self.dx2=dx**2
@@ -44,6 +49,41 @@ class DiffuseOcean:
     self.dt = self.dx2*self.dy2/( 2*self.a*(self.dx2+self.dy2) )
     nci.close()
     ncp.close()
+
+  def projectOnPismGrid(self):
+
+    def extend_interp(datafield):
+      dfield_ext = ma.concatenate([ma.column_stack(southernlimitmask), datafield], 0)
+      return interp(dfield_ext, self.olon, olat_ext, pismlon, pismlat)
+      
+    olat_ext = np.append(-82.1,self.olat)
+    # add masked values at southernmost end
+    southernlimitmask = ma.masked_all(len(self.olon))
+    xgrid, ygrid = np.meshgrid(self.x,self.y)
+    newprojection  = Proj(proj='stere',lat_0=-90,lon_0=0,lat_ts=-71,ellps='WGS84')
+    # these should be the same as the lon lat variables in Le Brocq
+    pismlon, pismlat = newprojection(xgrid,ygrid,inverse=True)
+    self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
+    self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
+    
+    for t in np.arange(0,len(self.time)):
+      print "project timestep" + str(t)
+      self.projtemp[t,:,:] = extend_interp(self.otemp[t,:,:])
+      self.projsalt[t,:,:] = extend_interp(self.osalt[t,:,:])
+      
+      #otempslice     = self.otemp[t,:,:]
+      #otempslice_ext = ma.concatenate([ma.column_stack(southernlimitmask), otempslice], 0)
+      #self.projtemp[t,:,:] = interp(otempslice_ext, self.olon, olat_ext, pismlon, pismlat)
+    ###osalt_ext = ma.concatenate([ma.column_stack(southernlimitmask), briossalt], 0)
+    #xgrid, ygrid = np.meshgrid(pism.variables['y'][:],pism.variables['y'][:])
+    ## create projection and new lons and lats that are needed for interpolation
+    #newprojection  = Proj(proj='stere',lat_0=-90,lon_0=0,lat_ts=-71,ellps='WGS84')
+    ## these should be the same as the lon lat variables in Le Brocq
+    #pismlon, pismlat = newprojection(xgrid,ygrid,inverse=True)
+
+    #projvart      = interp(briostemp_ext, brioslon, brioslat_ext, pismlon, pismlat)
+    #projvars      = interp(briossalt_ext, brioslon, brioslat_ext, pismlon, pismlat)
+
 
   def findAboveAndBelowSea(self):
     belowsea = self.topg <= 0.
@@ -127,6 +167,7 @@ class DiffuseOcean:
         m += 1
       self.salt_out[t,:,:] = u
     self.notmask = notmask
+    
   def writeNetcdf(self):
     ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
     ncout.createDimension('time',size=None)
