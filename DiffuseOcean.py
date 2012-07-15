@@ -16,26 +16,16 @@ class DiffuseOcean:
     self.timesteps = timesteps
     self.a         = 1e6    # Diffusion constant.
 
-#scen  = "rcp85"
-#infile  = "../projected_files/brios_15km_" + scen + ".nc"
-#outfile = "../diffused_files/brios_15km_" + scen + ".nc"
-#pismfile = "/iplex/01/tumble/mengel/pismOut/pismDev_gh002_071ECEarthBoundsEsia56NoMass15km/NoMass.nc"
-#timesteps = 150000 # Number of time-steps to evolve system.
-
   def getInputData(self):
     nci = nc.Dataset(self.infile,  'r')
     ncp = nc.Dataset(self.pismfile,'r')
-    self.topg = ncp.variables['topg'][0,:,:]
-    self.thk  = ncp.variables['thk'][0,:,:]
+    self.topg = ncp.variables['topg'][0,:,:].T
+    self.thk  = ncp.variables['thk'][0,:,:].T
     self.olat = nci.variables['lat'][:,0]
     # take out last 3 longitude values, its double data
     self.olon = nci.variables['lon'][0,0:-3]
-    self.otemp = ma.array(nci.variables["thetao"][:,:,0:-3])
-    self.osalt = ma.array(nci.variables["salinity"][:,:,0:-3])
-    self.otemp[self.otemp< -500. ] = ma.masked
-    self.otemp[self.otemp>  500. ] = ma.masked
-    self.osalt[self.osalt< -500. ] = ma.masked
-    self.osalt[self.osalt>  500. ] = ma.masked
+    self.otemp = nci.variables["thetao"][:,:,0:-3]
+    self.osalt = nci.variables["salinity"][:,:,0:-3]
     self.time = nci.variables['time'][:]
     self.x = ncp.variables['x'][:]
     self.y = ncp.variables['y'][:]
@@ -53,7 +43,7 @@ class DiffuseOcean:
 
     def extend_interp(datafield):
       dfield_ext = ma.concatenate([ma.column_stack(southernlimitmask), datafield], 0)
-      return interp(dfield_ext, self.olon, olat_ext, pismlon, pismlat)
+      return interp(dfield_ext, self.olon, olat_ext, self.pismlon, self.pismlat)
       
     olat_ext = np.append(-82.1,self.olat)
     # add masked values at southernmost end
@@ -61,11 +51,11 @@ class DiffuseOcean:
     xgrid, ygrid = np.meshgrid(self.x,self.y)
     newprojection  = Proj(proj='stere',lat_0=-90,lon_0=0,lat_ts=-71,ellps='WGS84')
     # these should be the same as the lon lat variables in Le Brocq
-    pismlon, pismlat = newprojection(xgrid,ygrid,inverse=True)
+    self.pismlon, self.pismlat = newprojection(xgrid,ygrid,inverse=True)
     self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     
-    for t in np.arange(0,2):#len(self.time)):
+    for t in np.arange(0,len(self.time)):
       print "project timestep" + str(t)
       self.projtemp[t,:,:] = extend_interp(self.otemp[t,:,:])
       self.projsalt[t,:,:] = extend_interp(self.osalt[t,:,:])
@@ -115,13 +105,12 @@ class DiffuseOcean:
         return u
       
       uii = ma.copy(dfield)
-      ui  = np.copy(dfield) # get rid of mask
-      ui[ui>  500.] = setmissval
-      ui[ui< -500.] = setmissval
-      u   = np.copy(ui)
-      ud  = np.zeros(ui.shape)
       notmask = ~uii.mask
       self.notmask = notmask
+      ui  = np.copy(uii) # get rid of mask
+      ui[uii.mask] = setmissval
+      u   = np.copy(ui)
+      ud  = np.zeros(ui.shape)
       m=0
       while m < self.timesteps:
         print "Diffuse for m =" + str(m) + "\n"
@@ -130,49 +119,15 @@ class DiffuseOcean:
         m += 1
       return u
       
-    self.dfutemp    = np.copy(self.projtemp)
+    self.dfutemp    = ma.copy(self.projtemp)
     self.dfutemp[:] = 0.
-    #temp_outraw = np.copy(temp_out)
-    self.dfusalt    = np.copy(self.dfutemp)
+    self.dfusalt    = ma.copy(self.dfutemp)
 
     print "start diffusion\n"
-    for t in np.arange(0,1):#self.projtemp.shape[0]):
+    for t in np.arange(0,self.projtemp.shape[0]):
       print "diffuse timestep " + str(t)+ "\n"
       self.dfutemp[t,:,:] = run_diffuse(self.projtemp[t,:,:],273.15 -2.0)
       self.dfusalt[t,:,:] = run_diffuse(self.projsalt[t,:,:],34.8)
-      
-      #uii = ma.copy(self.temp_all[t,:,:])
-      #ui  = np.copy(self.temp_all[t,:,:]) # get rid of mask
-      #notmask = ~uii.mask
-      #ui[ui>500.]  = 273.15 -2.
-      #ui[ui<500.] = 273.15 -2.
-      #u   = np.copy(ui)
-      #ud  = np.zeros(ui.shape)
-      #m=0
-      #while m < self.timesteps:
-        #print "Computing temp for m =" + str(m) + "\n"
-        #u  = diffuse(ui, uii)
-        #ui = u
-        #m += 1
-      #self.temp_out[t,:,:] = u
-      ##temp_outraw[t,:,:] = uii
-
-      #uii = ma.copy(self.salt_all[t,:,:])
-      #ui  = np.copy(self.salt_all[t,:,:])  # get rid of mask
-      #notmask = ~uii.mask
-      #ui[ui>500.] = 34.8
-      #ui[ui<-500.] = 34.8
-      #u    = np.copy(ui)
-      #ud   = np.zeros(ui.shape)
-      #print "start salinity"
-      #m=0
-      #while m < self.timesteps:
-        #print "Computing salt for m =" + str(m) + "\n"
-        #u  = diffuse(ui, uii)
-        #ui = u
-        #m += 1
-      #self.salt_out[t,:,:] = u
-    #self.notmask = notmask
     
   def writeNetcdf(self):
     ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
@@ -181,8 +136,6 @@ class DiffuseOcean:
     ncout.createDimension('y',size=len(self.y))
     ncvart  = ncout.createVariable( 'thetao','float32',('time','y','x') )
     ncvars = ncout.createVariable( 'salinity','float32',('time','y','x')  )
-    #ncvart  = ncout.createVariable( 'thetao','float32',('y','x') )
-    #ncvars = ncout.createVariable( 'salinity','float32',('y','x')  )
     ncvartr = ncout.createVariable( 'thetao_raw','float32',('time','y','x')  )
     nct   = ncout.createVariable( 'time','float32',('time',) )
     ncx   = ncout.createVariable( 'x','float32',('x',) )
@@ -204,6 +157,8 @@ class DiffuseOcean:
     ncvartr[:] = self.projtemp
     ncx[:]     = self.x
     ncy[:]     = self.y
+    nclat[:]   = self.pismlat
+    nclon[:]   = self.pismlon
     ncthk[:]    = self.thk
     nctg[:]     = self.topg
     ncx1[:]     = self.abovesea1
