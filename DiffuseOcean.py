@@ -175,6 +175,7 @@ class DiffuseOcean:
     ncvars.units = 'psu'
     ncthk.units  = 'meters'
     nctg.units   = 'meters'
-
+    nct.units    = "years since 01-01-00"
+    nct.calendar = "365_day"
     ncout.close()
         
