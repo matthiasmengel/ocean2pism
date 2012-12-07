@@ -44,7 +44,7 @@ class DiffuseOcean:
     def extend_interp(datafield):
       dfield_ext = ma.concatenate([ma.column_stack(southernlimitmask), datafield], 0)
       return interp(dfield_ext, self.olon, olat_ext, self.pismlon, self.pismlat)
-      
+
     olat_ext = np.append(-82.1,self.olat)
     # add masked values at southernmost end
     southernlimitmask = ma.masked_all(len(self.olon))
@@ -54,12 +54,12 @@ class DiffuseOcean:
     self.pismlon, self.pismlat = newprojection(xgrid,ygrid,inverse=True)
     self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
-    
+
     for t in np.arange(0,len(self.time)):
       print "project timestep" + str(t)
       self.projtemp[t,:,:] = extend_interp(self.otemp[t,:,:])
       self.projsalt[t,:,:] = extend_interp(self.osalt[t,:,:])
-    
+
   def findAboveAndBelowSea(self):
     belowsea = self.topg <= 0.
     abovesea = self.topg >  0.
@@ -82,9 +82,9 @@ class DiffuseOcean:
     self.abovesea4 = abovesea4
 
   def runDiffusion(self):
-  
+
     def run_diffuse(dfield, setmissval):
-      
+
       def diffuse(ui, uii):
         """ This function uses a numpy expression to evaluate the derivatives
             in the Laplacian, and calculates u[i,j] based on ui[i,j]. """
@@ -103,7 +103,7 @@ class DiffuseOcean:
                           self.neighboursbelow[1:-1, 1:-1] )
         u[self.neighboursbelowmask] = ud[self.neighboursbelowmask]
         return u
-      
+
       uii = ma.copy(dfield)
       notmask = ~uii.mask
       self.notmask = notmask
@@ -118,7 +118,7 @@ class DiffuseOcean:
         ui = u
         m += 1
       return u
-      
+
     self.dfutemp    = ma.copy(self.projtemp)
     self.dfutemp[:] = 0.
     self.dfusalt    = ma.copy(self.dfutemp)
@@ -128,7 +128,7 @@ class DiffuseOcean:
       print "diffuse timestep " + str(t)+ "\n"
       self.dfutemp[t,:,:] = run_diffuse(self.projtemp[t,:,:],273.15 -2.0)
       self.dfusalt[t,:,:] = run_diffuse(self.projsalt[t,:,:],34.8)
-    
+
   def writeNetcdf(self):
     ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
     ncout.createDimension('time',size=None)
@@ -177,5 +177,6 @@ class DiffuseOcean:
     nctg.units   = 'meters'
     nct.units    = "years since 01-01-00"
     nct.calendar = "365_day"
+    ncout.comment = "diffused over " + str(self.timesteps) + "."
     ncout.close()
-        
+
