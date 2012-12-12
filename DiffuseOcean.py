@@ -19,14 +19,16 @@ class DiffuseOcean:
   def getInputData(self):
     nci = nc.Dataset(self.infile,  'r')
     ncp = nc.Dataset(self.pismfile,'r')
-    self.topg = ncp.variables['topg'][0,:,:].T
-    self.thk  = ncp.variables['thk'][0,:,:].T
-    self.olat = nci.variables['lat'][:,0]
+    self.topg = ncp.variables['topg'][0,:,:]
+    self.thk  = ncp.variables['thk'][0,:,:]
+    self.olat = np.squeeze(nci.variables['lat'][:])[:,0]
     # take out last 3 longitude values, its double data
-    self.olon = nci.variables['lon'][0,0:-3]
-    self.otemp = nci.variables["thetao"][:,:,0:-3]
-    self.osalt = nci.variables["salinity"][:,:,0:-3]
+    self.olon = np.squeeze(nci.variables['lon'][:])[0,0:-3]
+    self.otemp = np.squeeze(nci.variables["thetao"][:])[:,:,0:-3] +273.15
+    self.osalt = np.squeeze(nci.variables["salinity"][:])[:,:,0:-3]
     self.time = nci.variables['time'][:]
+    self.timeunits = nci.variables['time'].units
+    self.calendar  = nci.variables['time'].calendar
     self.x = ncp.variables['x'][:]
     self.y = ncp.variables['y'][:]
     dx = self.x[1]-self.x[0]
@@ -54,6 +56,7 @@ class DiffuseOcean:
     self.pismlon, self.pismlat = newprojection(xgrid,ygrid,inverse=True)
     self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
+
 
     for t in np.arange(0,len(self.time)):
       print "project timestep" + str(t)
@@ -172,11 +175,11 @@ class DiffuseOcean:
     ncx.units = 'meters'
     ncvart.units = 'Kelvin'
     ncvartr.units = 'Kelvin'
-    ncvars.units = 'psu'
+    ncvars.units = 'g/kg'
     ncthk.units  = 'meters'
     nctg.units   = 'meters'
-    nct.units    = "years since 01-01-00"
-    nct.calendar = "365_day"
+    nct.units    = self.timeunits
+    nct.calendar = self.calendar
     ncout.comment = "diffused over " + str(self.timesteps) + "."
     ncout.close()
 
