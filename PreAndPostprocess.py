@@ -29,7 +29,8 @@ class PreAndPostProcess:
 
     for pattern in [".t", ".s"]:
       #print self.sourcepath + "/" + self.runid + pattern + ".*.nc"
-      infiles  = glob.glob(self.sourcepath + "/" + self.runid + pattern + ".*.nc")
+      infiles  = sorted(glob.glob(self.sourcepath + "/" + self.runid + pattern + ".*.nc"))
+      #print infiles
       if len(infiles) == 0:
         raise PreAndPostProcessException("no files to concatenate in " + self.sourcepath)
 
@@ -65,9 +66,11 @@ class PreAndPostProcess:
     subprocess.check_call(cmd, shell=True)
 
 
-  def choose_sigmalevel(self, level):
+  def choose_sigmalevel(self, level, inputpath=""):
 
-    infl = self.combinep  + self.runid + ".nc"
+    inp = self.combinep if inputpath =="" else inputpath
+
+    infl = inp  + self.runid + ".nc"
     outf = self.sigmalevp + self.runid + ".nc"
     cmd = "cdo -O -vertmean -sellevel," + str(level) + " -chname,temperature,thetao " + infl + " " + outf
 
