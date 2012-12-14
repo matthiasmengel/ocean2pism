@@ -10,6 +10,7 @@ class DiffuseOcean:
   """A class to diffuse Ocean Data over land where topg < 0.
   """
   def __init__(self, infile, outfile, pismfile, timesteps):
+    print infile
     self.infile    = infile
     self.outfile   = outfile
     self.pismfile  = pismfile

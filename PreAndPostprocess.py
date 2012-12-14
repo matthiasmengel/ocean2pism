@@ -6,11 +6,11 @@ class PreAndPostProcessException(Exception):
 
 class PreAndPostProcess:
 
-  def __init__(self, sourcepath, outpath, runid):
+  def __init__(self, sourcepath, outpath, briosid):
 
     self.sourcepath = sourcepath
     self.outpath    = outpath
-    self.runid      = runid
+    self.briosid      = briosid
     self.concatp    = outpath + "/concatenated/"
     self.yearavep   = outpath + "/yearmeantaxisandmissing/"
     self.combinep   = outpath + "/combinedfields/"
@@ -28,13 +28,13 @@ class PreAndPostProcess:
   def concatenate(self):
 
     for pattern in [".t", ".s"]:
-      #print self.sourcepath + "/" + self.runid + pattern + ".*.nc"
-      infiles  = sorted(glob.glob(self.sourcepath + "/" + self.runid + pattern + ".*.nc"))
+      #print self.sourcepath + "/" + self.briosid + pattern + ".*.nc"
+      infiles  = sorted(glob.glob(self.sourcepath + "/" + self.briosid + pattern + ".*.nc"))
       #print infiles
       if len(infiles) == 0:
         raise PreAndPostProcessException("no files to concatenate in " + self.sourcepath)
 
-      concfile = self.concatp + "/" + self.runid + pattern + ".nc"
+      concfile = self.concatp + "/" + self.briosid + pattern + ".nc"
       #print infiles
       infilestr = ""
       for fl in infiles:
@@ -49,18 +49,18 @@ class PreAndPostProcess:
 
     timeavefiles = ""
     for pt in [".t", ".s"]:
-      starty  = "1950" if "20C" in self.runid else "2000"
+      starty  = "1950" if "20C" in self.briosid else "2000"
       missval = "35" if pt == ".s" else "0"
 
-      timeavefile = self.yearavep + self.runid + pt + ".nc"
+      timeavefile = self.yearavep + self.briosid + pt + ".nc"
       cmd = "cdo yearmean -settaxis," + starty + "-01-01,00:00:00,1mon -setctomiss," + missval
-      cmd += " " + self.concatp + self.runid + pt + ".nc " + timeavefile
+      cmd += " " + self.concatp + self.briosid + pt + ".nc " + timeavefile
 
       print "## " + cmd
       subprocess.check_call(cmd, shell=True)
       timeavefiles += timeavefile + " "
 
-    mergefile = self.combinep + self.runid + ".nc"
+    mergefile = self.combinep + self.briosid + ".nc"
     cmd = "cdo -O merge " + timeavefiles + " " + mergefile
     print "## " + cmd
     subprocess.check_call(cmd, shell=True)
@@ -70,8 +70,9 @@ class PreAndPostProcess:
 
     inp = self.combinep if inputpath =="" else inputpath
 
-    infl = inp  + self.runid + ".nc"
-    outf = self.sigmalevp + self.runid + ".nc"
+    levstr = level.replace(",","")
+    infl = inp  + self.briosid + ".nc"
+    outf = self.sigmalevp + self.briosid + "__" + levstr + ".nc"
     cmd = "cdo -O -vertmean -sellevel," + str(level) + " -chname,temperature,thetao " + infl + " " + outf
 
     print "## " + cmd
