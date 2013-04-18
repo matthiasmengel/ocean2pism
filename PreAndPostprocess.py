@@ -15,6 +15,7 @@ class PreAndPostProcess:
     self.yearavep   = outpath + "/yearmeantaxisandmissing/"
     self.combinep   = outpath + "/combinedfields/"
     self.sigmalevp  = outpath + "/sigmalevel/"
+    self.timeavep   = outpath + "/timeave/"
 
     self._makedirs()
 
@@ -82,17 +83,20 @@ class PreAndPostProcess:
     subprocess.check_call(cmd, shell=True)
 
 
-  def average_over_years(self, infile, outpath, tstep1, tsteplast, addstring=""):
-    outp    = outpath + "/multiyearaverages/"
-
+  def average_over_years(self, levelid, year1, yearend):
+    outp   = self.timeavep
+    levstr = levelid.replace(",","")
+    infl   = self.outpath + "/diffused/" + self.briosid + "__" + levstr + ".nc"
+    outf   = outp + self.briosid + "__" + levstr + "_" + str(year1) + "_" + str(yearend) + ".nc"
     os.system("mkdir -p " + outp)
-    infl = outpath + "/diffused/" + infile
-    cmd = "ncra -F -O -d time," + str(tstep1) + "," + str(tsteplast) + ",1 " + infl + " " + outp + infile
-    print "## create " + outp + infile
+
+    #cmd = "ncra -F -O -d time," + str(tstep1) + "," + str(tsteplast) + ",1 " + infl + " " + outf
+    cmd = "cdo timmean -selyear," + str(year1) + "/" + str(yearend) + " " + infl + " " + outf
+    print "## " + cmd
     subprocess.check_call(cmd, shell=True)
-    # this has to be in the diffusion code soon
-    cmd = "ncatted -O -a units,salinity,o,c,g/kg " + outp + infile
-    subprocess.check_call(cmd, shell=True)
+    ## this has to be in the diffusion code soon
+    #cmd = "ncatted -O -a units,salinity,o,c,g/kg " + outp + infile
+    #subprocess.check_call(cmd, shell=True)
 
 
   #def combine_fields(self, tfile, sfile, outpath, addstring=""):
