@@ -27,6 +27,7 @@ class DiffuseOcean:
     self.olon = np.squeeze(nci.variables['lon'][:])[0,0:-3]
     self.otemp = np.squeeze(nci.variables["thetao"][:])[:,:,0:-3] +273.15
     self.osalt = np.squeeze(nci.variables["salinity"][:])[:,:,0:-3]
+    self.omelt = np.squeeze(nci.variables["ismelt"][:])[:,:,0:-3]
     self.time = nci.variables['time'][:]
     self.timeunits = nci.variables['time'].units
     self.calendar  = nci.variables['time'].calendar
@@ -57,12 +58,14 @@ class DiffuseOcean:
     self.pismlon, self.pismlat = newprojection(xgrid,ygrid,inverse=True)
     self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
     self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
+    self.projmelt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
 
 
     for t in np.arange(0,len(self.time)):
       print "project timestep" + str(t)
       self.projtemp[t,:,:] = extend_interp(self.otemp[t,:,:])
       self.projsalt[t,:,:] = extend_interp(self.osalt[t,:,:])
+      self.projmelt[t,:,:] = extend_interp(self.omelt[t,:,:])
 
   def findAboveAndBelowSea(self):
     belowsea = self.topg <= 0.
@@ -141,6 +144,7 @@ class DiffuseOcean:
     ncvart  = ncout.createVariable( 'thetao','float32',('time','y','x') )
     ncvars = ncout.createVariable( 'salinity','float32',('time','y','x')  )
     ncvartr = ncout.createVariable( 'thetao_raw','float32',('time','y','x')  )
+    ncvarm = ncout.createVariable( 'ismelt','float32',('time','y','x')  )
     nct   = ncout.createVariable( 'time','float32',('time',) )
     ncx   = ncout.createVariable( 'x','float32',('x',) )
     ncy   = ncout.createVariable( 'y','float32',('y',) )
@@ -159,6 +163,7 @@ class DiffuseOcean:
     ncvart[:]  = self.dfutemp
     ncvars[:]  = self.dfusalt
     ncvartr[:] = self.projtemp
+    ncvarm[:] = self.projmelt 
     ncx[:]     = self.x
     ncy[:]     = self.y
     nclat[:]   = self.pismlat
@@ -176,6 +181,7 @@ class DiffuseOcean:
     ncx.units = 'meters'
     ncvart.units = 'Kelvin'
     ncvartr.units = 'Kelvin'
+    ncvarm.units = 'm/year'
     ncvars.units = 'g/kg'
     ncthk.units  = 'meters'
     nctg.units   = 'meters'

@@ -28,7 +28,7 @@ class PreAndPostProcess:
 
   def concatenate(self):
 
-    for pattern in [".t", ".s"]:
+    for pattern in [".t", ".s", ".ismelt"]:
       #print self.sourcepath + "/" + self.briosid + pattern + ".*.nc"
       infiles  = sorted(glob.glob(self.sourcepath + "/" + self.briosid + pattern + ".*.nc"))
       #print infiles
@@ -49,7 +49,7 @@ class PreAndPostProcess:
   def yearly_ave_taxis_missval_combine(self):
 
     timeavefiles = ""
-    for pt in [".t", ".s"]:
+    for pt in [".t", ".s", ".ismelt"]:
       starty  = "1950" if "20C" in self.briosid else "2000"
       missval = "35" if pt == ".s" else "0"
 
@@ -60,6 +60,8 @@ class PreAndPostProcess:
       print "## " + cmd
       subprocess.check_call(cmd, shell=True)
       timeavefiles += timeavefile + " "
+
+    enlargefile = self.yearavep + self.briosid + ".ismelt.nc"
 
     mergefile = self.combinep + self.briosid + ".nc"
     cmd = "cdo -O merge " + timeavefiles + " " + mergefile
@@ -73,10 +75,15 @@ class PreAndPostProcess:
 
     levstr = level.replace(",","")
     infl = inp  + self.briosid + ".nc"
-    outf = self.sigmalevp + self.briosid + "__" + levstr + ".nc"
-    cmd = "cdo -O -vertmean -sellevel," + str(level) + " -chname,temperature,thetao " + infl + " " + outf
-
+    meanf = self.sigmalevp + self.briosid + "__" + levstr + "ts.nc"
+    cmd = "cdo -O -vertmean -sellevel," + str(level) + " -chname,temperature,thetao " + infl + " " + meanf
+    #cmd = "cdo -O -vertmean -chname,temperature,thetao " + infl + " " + meanf
     print "## " + cmd
+    subprocess.check_call(cmd, shell=True)
+
+    # add again the ismelt as it was lost by sellevel
+    outf = self.sigmalevp + self.briosid + "__" + levstr + ".nc"
+    cmd = "cdo -O merge " + meanf + " " + self.yearavep + self.briosid + ".ismelt.nc " + outf
     subprocess.check_call(cmd, shell=True)
 
     cmd = "ncatted -O -a units,salinity,o,c,g/kg " + outf
