@@ -5,21 +5,22 @@ import numpy as np
 import numpy.ma as ma
 from mpl_toolkits.basemap import interp
 from pyproj import Proj
+import datetime
 
 class DiffuseOcean:
   """A class to diffuse Ocean Data over land where topg < 0.
   """
-  def __init__(self, infile, outfile, pismfile, timesteps):
+  def __init__(self, infile, outfile, destination_grid_file, timesteps):
     print infile
     self.infile    = infile
     self.outfile   = outfile
-    self.pismfile  = pismfile
+    self.destination_grid_file  = destination_grid_file
     self.timesteps = timesteps
     self.a         = 1e6    # Diffusion constant.
 
   def getInputData(self):
     nci = nc.Dataset(self.infile,  'r')
-    ncp = nc.Dataset(self.pismfile,'r')
+    ncp = nc.Dataset(self.destination_grid_file,'r')
     self.topg = ncp.variables['topg'][0,:,:]
     self.thk  = ncp.variables['thk'][0,:,:]
     self.olat = np.squeeze(nci.variables['lat'][:])[:,0]
@@ -40,6 +41,7 @@ class DiffuseOcean:
     # For stability, this is the largest interval possible
     # for the size of the time-step:
     self.dt = self.dx2*self.dy2/( 2*self.a*(self.dx2+self.dy2) )
+    self.history = nci.history
     nci.close()
     ncp.close()
 
@@ -136,7 +138,11 @@ class DiffuseOcean:
       self.dfutemp[t,:,:] = run_diffuse(self.projtemp[t,:,:],273.15 -2.0)
       self.dfusalt[t,:,:] = run_diffuse(self.projsalt[t,:,:],34.8)
 
-  def writeNetcdf(self):
+  def writeNetcdf(self, lite):
+
+    outfile = self.outfile.strip(".nc") + "_lite.nc" if lite else self.outfile
+
+    print "create netcdf file\n" + outfile
     ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
     ncout.createDimension('time',size=None)
     ncout.createDimension('x',size=len(self.x))
@@ -150,43 +156,55 @@ class DiffuseOcean:
     ncy   = ncout.createVariable( 'y','float32',('y',) )
     nclon = ncout.createVariable( 'lon','float32',('y','x') )
     nclat = ncout.createVariable( 'lat','float32',('y','x') )
-    ncthk = ncout.createVariable( 'thk','float32',('y','x') )
-    nctg  = ncout.createVariable( 'topg','float32',('y','x') )
-    ncx1  = ncout.createVariable( 'abovesea1','float32',('y','x') )
-    ncx2  = ncout.createVariable( 'abovesea2','float32',('y','x') )
-    ncx3  = ncout.createVariable( 'abovesea3','float32',('y','x') )
-    ncx4  = ncout.createVariable( 'abovesea4','float32',('y','x') )
-    ncx5  = ncout.createVariable( 'neighboursbelowmask','float32',('y','x') )
-    ncx6  = ncout.createVariable( 'neighboursbelow','float32',('y','x') )
-    ncx7  = ncout.createVariable( 'notmask','float32',('y','x') )
+
+    if not lite:
+      ncthk = ncout.createVariable( 'thk','float32',('y','x') )
+      nctg  = ncout.createVariable( 'topg','float32',('y','x') )
+      ncx1  = ncout.createVariable( 'abovesea1','float32',('y','x') )
+      ncx2  = ncout.createVariable( 'abovesea2','float32',('y','x') )
+      ncx3  = ncout.createVariable( 'abovesea3','float32',('y','x') )
+      ncx4  = ncout.createVariable( 'abovesea4','float32',('y','x') )
+      ncx5  = ncout.createVariable( 'neighboursbelowmask','float32',('y','x') )
+      ncx6  = ncout.createVariable( 'neighboursbelow','float32',('y','x') )
+      ncx7  = ncout.createVariable( 'nolandmask','float32',('y','x') )
+
     nct[:]     = self.time
     ncvart[:]  = self.dfutemp
     ncvars[:]  = self.dfusalt
     ncvartr[:] = self.projtemp
-    ncvarm[:] = self.projmelt 
+    ncvarm[:] = self.projmelt
     ncx[:]     = self.x
     ncy[:]     = self.y
     nclat[:]   = self.pismlat
     nclon[:]   = self.pismlon
-    ncthk[:]    = self.thk
-    nctg[:]     = self.topg
-    ncx1[:]     = self.abovesea1
-    ncx2[:]     = self.abovesea2
-    ncx3[:]     = self.abovesea3
-    ncx4[:]     = self.abovesea4
-    ncx5[:]     = self.neighboursbelowmask
-    ncx6[:]     = self.neighboursbelow
-    ncx7[:]     = self.notmask
+
+    if not lite:
+      ncthk[:]    = self.thk
+      nctg[:]     = self.topg
+      ncx1[:]     = self.abovesea1
+      ncx2[:]     = self.abovesea2
+      ncx3[:]     = self.abovesea3
+      ncx4[:]     = self.abovesea4
+      ncx5[:]     = self.neighboursbelowmask
+      ncx6[:]     = self.neighboursbelow
+      ncx7[:]     = self.notmask
+      ncthk.units  = 'meters'
+      nctg.units   = 'meters'
+
     ncy.units = 'meters'
     ncx.units = 'meters'
     ncvart.units = 'Kelvin'
     ncvartr.units = 'Kelvin'
     ncvarm.units = 'm/year'
     ncvars.units = 'g/kg'
-    ncthk.units  = 'meters'
-    nctg.units   = 'meters'
     nct.units    = self.timeunits
     nct.calendar = self.calendar
-    ncout.comment = "diffused over " + str(self.timesteps) + "."
+
+    ncout.diffuse_t = "diffused over " + str(self.timesteps) + "."
+    ncout.datafile = self.infile
+    ncout.destination_grid_file = self.destination_grid_file
+    now = datetime.datetime.now().strftime("%B %d, %Y")
+    ncout.comment  = "created by matthias.mengel@pik at " + now
+    ncout.history  = self.history
     ncout.close()
 

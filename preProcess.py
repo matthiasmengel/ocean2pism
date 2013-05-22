@@ -12,7 +12,6 @@ sourcepath = "/iplex/01/tumble/mengel/pismSourceData/20120705_BriosHadgem2Histor
 sourcepath = "/iplex/01/tumble/mengel/pismSourceData/20120705_BriosHadgem2HistoricalRcp45Rcp85/origdata_hist/"
 #workpath   = "/iplex/01/tumble/mengel/pismInputData/"
 workpath   = "/scratch/01/mengel/pismInputData/"
-gridfile   = "/iplex/01/tumble/mengel/pismOut/pismDev_gh002_071ECEarthBoundsEsia56NoMass15km/NoMass.nc"
 runname    = os.path.basename(os.getcwd())
 outpath    = workpath + runname
 ## if files were already concatenated earlier
