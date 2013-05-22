@@ -81,12 +81,16 @@ class PreAndPostProcess:
     print "## " + cmd
     subprocess.check_call(cmd, shell=True)
 
+    # change to pism understandable salinity units
+    cmd = "ncatted -O -a units,salinity,o,c,g/kg " + meanf
+    subprocess.check_call(cmd, shell=True)
+
+    cmd = "ncatted -O -a extracted_sigma_level,global,a,c," + str(level) + " " + meanf
+    subprocess.check_call(cmd, shell=True)
+
     # add again the ismelt as it was lost by sellevel
     outf = self.sigmalevp + self.briosid + "__" + levstr + ".nc"
     cmd = "cdo -O merge " + meanf + " " + self.yearavep + self.briosid + ".ismelt.nc " + outf
-    subprocess.check_call(cmd, shell=True)
-
-    cmd = "ncatted -O -a units,salinity,o,c,g/kg " + outf
     subprocess.check_call(cmd, shell=True)
 
 

@@ -19,7 +19,7 @@ runname    = os.path.basename(os.getcwd())
 outpath    = workpath + runname
 
 briosids = ["BRIOS.HadGem2_RCP85"]
-levelids = ["1","1,2","1,2,3","2","3","2,3"]
+levelids = ["1"]#,"1,2","1,2,3","2","3","2,3"]
 runids = []
 for briosid in briosids:
   for levelid in levelids:
