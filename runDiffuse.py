@@ -12,34 +12,66 @@ import numpy as np
 import mpi4py_map
 
 diffuse_timesteps = 1
+diffuse_variables = ["thetao", "salinity", "ismelt"]
+diffuse_missvals  = {"thetao":273.15-2., "salinity":34.8, "ismelt":0.}
 #workpath   = "/iplex/01/tumble/mengel/pismInputData/"
 workpath   = "/scratch/01/mengel/pismInputData/"
 destination_grid_file = "/iplex/01/tumble/mengel/pismOut/pismDev_gh002_071ECEarthBoundsEsia56NoMass15km/NoMass.nc"
 runname    = os.path.basename(os.getcwd())
 outpath    = workpath + runname
-infile     = outpath + "/sigmalevel/" + "BRIOS.HadGem2_20C__1.nc"
-outfile    = outpath + "/" + os.path.basename(infile).strip(".nc") + "_diffused_" + str(diffuse_timesteps) + ".nc"
+infile     = outpath + "/sigmalevel/" + "BRIOS.HadGem2_20C_sigma1.nc"
+outfile    = outpath + "/" + os.path.basename(infile).strip(".nc") + "_diffused" + str(diffuse_timesteps) + ".nc"
 
 # only copy data necessary for pism if lite
 lite = True
 
 os.system("mkdir -p " + outpath + "/diffused/")
 print "initialize"
-dd = DiffuseOcean.DiffuseOcean(infile, outfile, destination_grid_file, diffuse_timesteps)
+dd = DiffuseOcean.DiffuseOcean(infile, outfile, destination_grid_file, diffuse_timesteps, diffuse_variables, diffuse_missvals)
 print "get input data"
 #try:
-dd.getInputData()
+dd.getTimeIndependentInputData()
+dd.prepareProjection()
+dd.findAboveAndBelowSea()
 #except RuntimeError as error:
   #print "###" + runid + " failed, " + str(error)
   #sys.exit(0)
 print "project on pism grid"
-dd.projectOnPismGrid()
+#dd.projectOnPismGrid()
 print "find points above sl"
 dd.findAboveAndBelowSea()
-print "run diffusion"
-dd.runDiffusion()
-print "write netcdf"
-dd.writeNetcdf(lite)
+#print "run diffusion"
+#dd.runDiffusion()
+#print "write netcdf"
+#dd.writeNetcdf(lite)
+
+
+# try to get the communicator object to see whether mpi is available:
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    available = False if comm.size < 2 else True
+    print "mpi available, with ", comm.size, " processors."
+except:
+    available = False
+
+if available:
+  result_parallel = mpi4py_map.map(dd.projAndDiffu, xrange(dd.timesteps), debug=True)
+  dd.writeNetcdf(np.array(result_parallel), lite)
+else:
+  result_serial = map(dd.projAndDiffu, xrange(dd.timesteps))
+  dd.writeNetcdf(np.array(result_serial), lite)
+  #result_serial   = map(dd.runDiffusion, xrange(ncf_timesteps))
+  #dd.writeNetcdf(np.array(result_serial), lite)
+
+
+
+
+
+
+
+
+
 
 
 

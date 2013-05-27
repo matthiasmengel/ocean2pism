@@ -75,7 +75,7 @@ class PreAndPostProcess:
 
     levstr = level.replace(",","")
     infl = inp  + self.briosid + ".nc"
-    meanf = self.sigmalevp + self.briosid + "__" + levstr + "ts.nc"
+    meanf = self.sigmalevp + self.briosid + "_sigma" + levstr + "ts.nc"
     cmd = "cdo -O -vertmean -sellevel," + str(level) + " -chname,temperature,thetao " + infl + " " + meanf
     #cmd = "cdo -O -vertmean -chname,temperature,thetao " + infl + " " + meanf
     print "## " + cmd
@@ -89,7 +89,7 @@ class PreAndPostProcess:
     subprocess.check_call(cmd, shell=True)
 
     # add again the ismelt as it was lost by sellevel
-    outf = self.sigmalevp + self.briosid + "__" + levstr + ".nc"
+    outf = self.sigmalevp + self.briosid + "_sigma" + levstr + ".nc"
     cmd = "cdo -O merge " + meanf + " " + self.yearavep + self.briosid + ".ismelt.nc " + outf
     subprocess.check_call(cmd, shell=True)
 
@@ -97,8 +97,8 @@ class PreAndPostProcess:
   def average_over_years(self, levelid, year1, yearend):
     outp   = self.timeavep
     levstr = levelid.replace(",","")
-    infl   = self.outpath + "/diffused/" + self.briosid + "__" + levstr + ".nc"
-    outf   = outp + self.briosid + "__" + levstr + "_" + str(year1) + "_" + str(yearend) + ".nc"
+    infl   = self.outpath + "/diffused/" + self.briosid + "_sigma" + levstr + ".nc"
+    outf   = outp + self.briosid + "_sigma" + levstr + "_" + str(year1) + "_" + str(yearend) + ".nc"
     os.system("mkdir -p " + outp)
 
     #cmd = "ncra -F -O -d time," + str(tstep1) + "," + str(tsteplast) + ",1 " + infl + " " + outf

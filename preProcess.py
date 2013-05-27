@@ -24,12 +24,8 @@ runids = []
 
 for briosid in briosids:
   for levelid in levelids:
-    #runids.append(briosid + "__" + levelid)
 
-    #briosid, levelid = runid.split("__")
-    #### choose sigma layer
     pp = PreAndPostProcess.PreAndPostProcess(sourcepath, outpath, briosid)
     if not concat_done:
       pp.concatenate()
-    #pp.yearly_ave_taxis_missval_combine()
     pp.choose_sigmalevel(levelid) # e.g. "1,2,3" or "2"
