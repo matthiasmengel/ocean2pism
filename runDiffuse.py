@@ -57,10 +57,10 @@ except:
 
 if available:
   result_parallel = mpi4py_map.map(dd.projAndDiffu, xrange(dd.timesteps), debug=True)
-  dd.writeNetcdf(np.array(result_parallel), lite)
+  dd.writeNetcdf(result_parallel, lite)
 else:
   result_serial = map(dd.projAndDiffu, xrange(dd.timesteps))
-  dd.writeNetcdf(np.array(result_serial), lite)
+  dd.writeNetcdf(result_serial, lite)
   #result_serial   = map(dd.runDiffusion, xrange(ncf_timesteps))
   #dd.writeNetcdf(np.array(result_serial), lite)
 

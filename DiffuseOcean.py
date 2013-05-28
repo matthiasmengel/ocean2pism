@@ -10,13 +10,13 @@ import datetime
 class DiffuseOcean:
   """A class to diffuse Ocean Data over land where topg < 0.
   """
-  def __init__(self, infile, outfile, destination_grid_file, timesteps, diffuse_vars, diffuse_missvals):
+  def __init__(self, infile, outfile, destination_grid_file, diffu_t, diffuse_vars, diffuse_missvals):
 
     print infile
     self.infile    = infile
     self.outfile   = outfile
     self.destination_grid_file  = destination_grid_file
-    self.timesteps = timesteps
+    self.diffu_t = diffu_t
     self.diffuse_vars = diffuse_vars
     self.diffuse_missvals = diffuse_missvals
     self.a         = 1e6    # Diffusion constant.
@@ -46,7 +46,7 @@ class DiffuseOcean:
     # For stability, this is the largest interval possible
     # for the size of the time-step:
     self.dt = self.dx2*self.dy2/( 2*self.a*(self.dx2+self.dy2) )
-    self.timesteps = len(self.time)
+    self.nctimesteps = len(self.time)
     self.history = nci.history
     nci.close()
     ncp.close()
@@ -140,13 +140,13 @@ class DiffuseOcean:
       ud  = np.zeros(ui.shape)
 
       m=0
-      while m < self.timesteps:
+      while m < self.diffu_t:
         if m % 100 == 0:
           print "Diffuse for m = ", m, " for data timestep ", tstep
         u  = diffuse(ui, projdata)
         ui = u
         m += 1
-      ma.array(u, mask = projdata.mask)
+      return ma.array(u, mask = projdata.mask)
 
 
     diffu_data = {"tstep":tstep}
@@ -158,115 +158,18 @@ class DiffuseOcean:
     return diffu_data
 
 
+  def writeNetcdf(self, diffu_data, lite):
 
-  def projectOnPismGrid(self):
+    ncdata = {}
+    for diffu_var in self.diffuse_vars:
+      ncdata[diffu_var] = ma.zeros([self.nctimesteps,len(self.x),len(self.y)])
 
-    def extend_interp(datafield):
-      dfield_ext = ma.concatenate([ma.column_stack(southernlimitmask), datafield], 0)
-      return interp(dfield_ext, self.olon, olat_ext, self.pismlon, self.pismlat)
+    ## collect data
+    for entry in diffu_data:
+      for diffu_var in self.diffuse_vars:
+        ncdata[diffu_var][entry["tstep"],:,:] = entry[diffu_var]
 
-    #olat_ext = np.append(-82.1,self.olat)
-    ## add masked values at southernmost end
-    #southernlimitmask = ma.masked_all(len(self.olon))
-    #xgrid, ygrid = np.meshgrid(self.x,self.y)
-    #newprojection  = Proj(proj='stere',lat_0=-90,lon_0=0,lat_ts=-71,ellps='WGS84')
-    # these should be the same as the lon lat variables in Le Brocq
-    self.pismlon, self.pismlat = newprojection(xgrid,ygrid,inverse=True)
-    self.projtemp = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
-    self.projsalt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
-    self.projmelt = ma.zeros([len(self.time),xgrid.shape[0],xgrid.shape[1]])
-
-
-    for t in np.arange(0,len(self.time)):
-      print "project timestep" + str(t)
-      self.projtemp[t,:,:] = extend_interp(self.otemp[t,:,:])
-      self.projsalt[t,:,:] = extend_interp(self.osalt[t,:,:])
-      self.projmelt[t,:,:] = extend_interp(self.omelt[t,:,:])
-
-
-
-  def runDiffusion(self, tstep):
-
-    def run_diffuse(dfield, setmissval):
-
-      def diffuse(ui, uii):
-        """ This function uses a numpy expression to evaluate the derivatives
-            in the Laplacian, and calculates u[i,j] based on ui[i,j]. """
-        # diffusion
-        u[1:-1, 1:-1] = ui[1:-1, 1:-1] + self.a*self.dt*( (ui[2:, 1:-1] -
-          2*ui[1:-1, 1:-1] + ui[:-2, 1:-1])/self.dx2 + (ui[1:-1, 2:] -
-          2*ui[1:-1, 1:-1] + ui[1:-1, :-2])/self.dy2 )
-        # set known brios values back to initial
-        u[notmask] = uii[notmask]
-        # set values with topg>0 that are adjacent topg<0 cells
-        # to the mean value of these topg<0 neighbours
-        ud[1:-1, 1:-1] = ((ui[ :-2,  1:-1] *self.abovesea1[1:-1, 1:-1] +
-                            ui[2:,   1:-1] *self.abovesea2[1:-1, 1:-1] +
-                            ui[1:-1,  :-2] *self.abovesea3[1:-1, 1:-1] +
-                            ui[1:-1, 2:]   *self.abovesea4[1:-1, 1:-1]) /
-                          self.neighboursbelow[1:-1, 1:-1] )
-        u[self.neighboursbelowmask] = ud[self.neighboursbelowmask]
-        return u
-
-      uii = ma.copy(dfield)
-      notmask = ~uii.mask
-      self.notmask = notmask
-      ui  = np.copy(uii) # get rid of mask
-      ui[uii.mask] = setmissval
-      u   = np.copy(ui)
-      ud  = np.zeros(ui.shape)
-      m=0
-      while m < self.timesteps:
-        print "Diffuse for m =" + str(m) + "\n"
-        u  = diffuse(ui, uii)
-        ui = u
-        m += 1
-      return u
-
-
-    for diffuse_var in self.diffuse_vars:
-      nci   = nc.Dataset(self.infile,  'r')
-      data_in = np.ma.masked_invalid(np.squeeze(nci.variables[self.diffuse_var][tstep,:,:]))
-      ui  = np.copy(data_in)
-      missval = 34.8 if diffuse_var == "salinity" else self.missval
-      ui[data_in.mask] = missval
-      nci.close()
-
-
-
-    self.dfutemp    = ma.copy(self.projtemp)
-    self.dfutemp[:] = 0.
-    self.dfusalt    = ma.copy(self.dfutemp)
-
-    print "start diffusion\n"
-    for t in np.arange(0,self.projtemp.shape[0]):
-      print "diffuse timestep " + str(t)+ "\n"
-      self.dfutemp[t,:,:] = run_diffuse(self.projtemp[t,:,:],273.15 -2.0)
-      self.dfusalt[t,:,:] = run_diffuse(self.projsalt[t,:,:],34.8)
-
-    ###############################
-    ui  = np.copy(data_in) # get rid of mask, diffuse cannot handle it
-    ui[data_in.mask] = self.missval
-    #ui[uii.mask] = setmissval
-    #print ui, self.missval
-    ## set all data where ice is grounded to missval
-    ui[~self.nolandmask]  = self.missval
-    u   = np.copy(ui)
-    ud  = np.zeros(ui.shape)
-    m=0
-    print "start diffusion of data timestep ", tstep
-    while m < self.timesteps:
-      if m % 100 == 0:
-        print "Diffuse for m = ", m, " for data timestep ", tstep
-      u  = diffuse(ui, data_in)
-      ui = u
-      m += 1
-    return ma.array(u, mask = data_in.mask)
-    ###############################
-
-
-  def writeNetcdf(self, lite):
-
+    nci = nc.Dataset(self.infile,  'r')
     outfile = self.outfile.strip(".nc") + "_lite.nc" if lite else self.outfile
 
     print "create netcdf file\n" + outfile
@@ -274,10 +177,10 @@ class DiffuseOcean:
     ncout.createDimension('time',size=None)
     ncout.createDimension('x',size=len(self.x))
     ncout.createDimension('y',size=len(self.y))
-    ncvart  = ncout.createVariable( 'thetao','float32',('time','y','x') )
-    ncvars = ncout.createVariable( 'salinity','float32',('time','y','x')  )
-    ncvartr = ncout.createVariable( 'thetao_raw','float32',('time','y','x')  )
-    ncvarm = ncout.createVariable( 'ismelt','float32',('time','y','x')  )
+    #ncvart  = ncout.createVariable( 'thetao','float32',('time','y','x') )
+    #ncvars = ncout.createVariable( 'salinity','float32',('time','y','x')  )
+    #ncvartr = ncout.createVariable( 'thetao_raw','float32',('time','y','x')  )
+    #ncvarm = ncout.createVariable( 'ismelt','float32',('time','y','x')  )
     nct   = ncout.createVariable( 'time','float32',('time',) )
     ncx   = ncout.createVariable( 'x','float32',('x',) )
     ncy   = ncout.createVariable( 'y','float32',('y',) )
@@ -296,14 +199,19 @@ class DiffuseOcean:
       ncx7  = ncout.createVariable( 'nolandmask','float32',('y','x') )
 
     nct[:]     = self.time
-    ncvart[:]  = self.dfutemp
-    ncvars[:]  = self.dfusalt
-    ncvartr[:] = self.projtemp
-    ncvarm[:] = self.projmelt
+    #ncvart[:]  = self.dfutemp
+    #ncvars[:]  = self.dfusalt
+    #ncvartr[:] = self.projtemp
+    #ncvarm[:] = self.projmelt
     ncx[:]     = self.x
     ncy[:]     = self.y
     nclat[:]   = self.pismlat
     nclon[:]   = self.pismlon
+
+    for diffu_var in self.diffuse_vars:
+      ncvar    = ncout.createVariable( diffu_var,'float32',('time','y','x') )
+      ncvar[:] = ncdata[diffu_var][:]
+      ncvar.units = nci.variables[diffu_var].units
 
     if not lite:
       ncthk[:]    = self.thk
@@ -320,18 +228,19 @@ class DiffuseOcean:
 
     ncy.units = 'meters'
     ncx.units = 'meters'
-    ncvart.units = 'Kelvin'
-    ncvartr.units = 'Kelvin'
-    ncvarm.units = 'm/year'
-    ncvars.units = 'g/kg'
+    #ncvart.units = 'Kelvin'
+    #ncvartr.units = 'Kelvin'
+    #ncvarm.units = 'm/year'
+    #ncvars.units = 'g/kg'
     nct.units    = self.timeunits
     nct.calendar = self.calendar
 
-    ncout.diffuse_t = "diffused over " + str(self.timesteps) + "."
+    ncout.diffuse_t = "diffused over " + str(self.diffu_t) + "."
     ncout.datafile = self.infile
     ncout.destination_grid_file = self.destination_grid_file
     now = datetime.datetime.now().strftime("%B %d, %Y")
     ncout.comment  = "created by matthias.mengel@pik at " + now
     ncout.history  = self.history
+    nci.close()
     ncout.close()
 
