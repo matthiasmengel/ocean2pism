@@ -31,9 +31,6 @@ class DiffuseOcean:
     self.olat = np.squeeze(nci.variables['lat'][:])[:,0]
     # take out last 3 longitude values, its double data in Brios
     self.olon = np.squeeze(nci.variables['lon'][:])[0,0:-3]
-    #self.otemp = np.squeeze(nci.variables["thetao"][:])[:,:,0:-3] +273.15
-    #self.osalt = np.squeeze(nci.variables["salinity"][:])[:,:,0:-3]
-    #self.omelt = np.squeeze(nci.variables["ismelt"][:])[:,:,0:-3]
     self.time = nci.variables['time'][:]
     self.timeunits = nci.variables['time'].units
     self.calendar  = nci.variables['time'].calendar
@@ -119,12 +116,11 @@ class DiffuseOcean:
 
       nci   = nc.Dataset(self.infile,  'r')
       # take out last 3 longitude values, its double data in Brios
-      print nci.variables[diffuse_var][:].shape
       try:
         data_in  = np.ma.masked_invalid(np.squeeze(nci.variables[diffuse_var][tstep,0,:,0:-3]))
       except ValueError:
         data_in  = np.ma.masked_invalid(np.squeeze(nci.variables[diffuse_var][tstep,:,0:-3]))
-      print data_in.shape
+
       nci.close()
       projdata = extend_interp(data_in)
 
@@ -146,7 +142,8 @@ class DiffuseOcean:
         u  = diffuse(ui, projdata)
         ui = u
         m += 1
-      return ma.array(u, mask = projdata.mask)
+      #return ma.array(u, mask = projdata.mask)
+      return u
 
 
     diffu_data = {"tstep":tstep}
@@ -173,14 +170,10 @@ class DiffuseOcean:
     outfile = self.outfile.strip(".nc") + "_lite.nc" if lite else self.outfile
 
     print "create netcdf file\n" + outfile
-    ncout = nc.Dataset(self.outfile, 'w', format='NETCDF3_CLASSIC')
+    ncout = nc.Dataset(outfile, 'w', format='NETCDF3_CLASSIC')
     ncout.createDimension('time',size=None)
     ncout.createDimension('x',size=len(self.x))
     ncout.createDimension('y',size=len(self.y))
-    #ncvart  = ncout.createVariable( 'thetao','float32',('time','y','x') )
-    #ncvars = ncout.createVariable( 'salinity','float32',('time','y','x')  )
-    #ncvartr = ncout.createVariable( 'thetao_raw','float32',('time','y','x')  )
-    #ncvarm = ncout.createVariable( 'ismelt','float32',('time','y','x')  )
     nct   = ncout.createVariable( 'time','float32',('time',) )
     ncx   = ncout.createVariable( 'x','float32',('x',) )
     ncy   = ncout.createVariable( 'y','float32',('y',) )
@@ -199,10 +192,6 @@ class DiffuseOcean:
       ncx7  = ncout.createVariable( 'nolandmask','float32',('y','x') )
 
     nct[:]     = self.time
-    #ncvart[:]  = self.dfutemp
-    #ncvars[:]  = self.dfusalt
-    #ncvartr[:] = self.projtemp
-    #ncvarm[:] = self.projmelt
     ncx[:]     = self.x
     ncy[:]     = self.y
     nclat[:]   = self.pismlat
@@ -210,8 +199,12 @@ class DiffuseOcean:
 
     for diffu_var in self.diffuse_vars:
       ncvar    = ncout.createVariable( diffu_var,'float32',('time','y','x') )
-      ncvar[:] = ncdata[diffu_var][:]
-      ncvar.units = nci.variables[diffu_var].units
+      if diffu_var == "thetao":
+        ncvar[:] = ncdata[diffu_var][:] + 273.15
+        ncvar.units = "Kelvin"
+      else:
+        ncvar[:] = ncdata[diffu_var][:]
+        ncvar.units = nci.variables[diffu_var].units
 
     if not lite:
       ncthk[:]    = self.thk
@@ -228,10 +221,6 @@ class DiffuseOcean:
 
     ncy.units = 'meters'
     ncx.units = 'meters'
-    #ncvart.units = 'Kelvin'
-    #ncvartr.units = 'Kelvin'
-    #ncvarm.units = 'm/year'
-    #ncvars.units = 'g/kg'
     nct.units    = self.timeunits
     nct.calendar = self.calendar
 
