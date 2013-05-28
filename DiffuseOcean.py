@@ -81,13 +81,12 @@ class DiffuseOcean:
 
   def projAndDiffu(self, tstep):
 
-    print "tstep",tstep
+    #print "tstep",tstep
 
     def extend_interp(datafield):
       # add masked values at southernmost end
       southernlimitmask = ma.masked_all(len(self.olon))
       olat_ext          = np.append(-82.1,self.olat)
-      print southernlimitmask.shape, datafield.shape
       dfield_ext = ma.concatenate([ma.column_stack(southernlimitmask), datafield], 0)
       return interp(dfield_ext, self.olon, olat_ext, self.pismlon, self.pismlat)
 
@@ -149,7 +148,7 @@ class DiffuseOcean:
     diffu_data = {"tstep":tstep}
 
     for diffuse_var in self.diffuse_vars:
-      print diffuse_var
+      #print diffuse_var
       diffu_data[diffuse_var] = run_diffuse(diffuse_var)
 
     return diffu_data

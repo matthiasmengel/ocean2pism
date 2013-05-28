@@ -11,7 +11,7 @@ import DiffuseOcean; reload(DiffuseOcean)
 import numpy as np
 import mpi4py_map
 
-diffuse_timesteps = 1
+diffuse_timesteps = 10000
 diffuse_variables = ["thetao", "salinity", "ismelt"]
 diffuse_missvals  = {"thetao":-2., "salinity":34.8, "ismelt":0.}
 #workpath   = "/iplex/01/tumble/mengel/pismInputData/"
@@ -19,8 +19,8 @@ workpath   = "/scratch/01/mengel/pismInputData/"
 destination_grid_file = "/iplex/01/tumble/mengel/pismOut/pismDev_gh002_071ECEarthBoundsEsia56NoMass15km/NoMass.nc"
 runname    = os.path.basename(os.getcwd())
 outpath    = workpath + runname
-infile     = outpath + "/sigmalevel/" + "BRIOS.HadGem2_20C_sigma1.nc"
-outfile    = outpath + "/" + os.path.basename(infile).strip(".nc") + "_diffused" + str(diffuse_timesteps) + ".nc"
+infile     = outpath + "/sigmalevel/" + "BRIOS.HadGem2_20C_sigma24.nc"
+outfile    = outpath + "/diffused/" + os.path.basename(infile).strip(".nc") + "_diffused" + str(diffuse_timesteps) + ".nc"
 
 # only copy data necessary for pism if lite
 lite = True

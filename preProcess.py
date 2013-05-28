@@ -19,7 +19,7 @@ concat_done=True
 
 #briosids = ["BRIOS.HadGem2_RCP85"]
 briosids = ["BRIOS.HadGem2_20C"]
-levelids = ["1"]#,"1,2","1,2,3","2","3","2,3"]
+levelids = ["24"]#,"1,2","1,2,3","2","3","2,3"]
 runids = []
 
 for briosid in briosids:
