@@ -11,7 +11,7 @@ import DiffuseOcean; reload(DiffuseOcean)
 import numpy as np
 import mpi4py_map
 
-diffuse_timesteps = 10000
+diffuse_timesteps = 10
 diffuse_variables = ["thetao", "salinity", "ismelt"]
 diffuse_missvals  = {"thetao":-2., "salinity":34.8, "ismelt":0.}
 #workpath   = "/iplex/01/tumble/mengel/pismInputData/"

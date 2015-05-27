@@ -76,6 +76,13 @@ class PreAndPostProcess:
 
   def choose_sigmalevel(self, level, inputpath=""):
 
+
+    """ Extracts the sigma levels, that are defined by level, and averages over them.
+        level must be given as string, eg. "2", or "1,2,3"
+        also change units of salinity to g/gk and add the ismelt (ice shelf melting)
+        variable to the file (that now does no more have a z axis).
+    """
+
     inp = self.combinep if inputpath =="" else inputpath
 
     levstr = level.replace(",","")
