@@ -46,7 +46,12 @@ class PreAndPostProcess:
       subprocess.check_call(cmd, shell=True)
 
 
-  def yearly_ave_taxis_missval_combine(self):
+  def combine_fields_year_ave(self):
+
+    """ Combine T and S fields after yearly averaging them.
+        Also set missing values, that have been just normal values
+        for Temperature exactly 0 and Salinity exactly 35.
+    """
 
     timeavefiles = ""
     for pt in [".t", ".s", ".ismelt"]:
