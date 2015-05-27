@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# This file is part of ocean2pism.
+
+# ocean2pism is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# ocean2pism is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with ocean2pism.  If not, see <http://www.gnu.org/licenses/>.
+
 destdir=`echo $PWD | awk -F/ '{print $NF}'`
 #sourcepath=/iplex/01/tumble/mengel/pismSourceData/20121113_RacmoEcEarthTemperatureAndSmbCorrected
 #destpath=/iplex/01/tumble/mengel/pismInputData/$destdir/multiyearave

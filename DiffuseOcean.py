@@ -1,9 +1,25 @@
+# This file is part of ocean2pism.
+
+# ocean2pism is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# ocean2pism is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with ocean2pism.  If not, see <http://www.gnu.org/licenses/>.
+
 
 import os, time
 import netCDF4 as nc
 import numpy as np
 import numpy.ma as ma
 from mpl_toolkits.basemap import interp
+# from scipy.interpolate import interp2d
 from pyproj import Proj
 import datetime
 
@@ -88,7 +104,10 @@ class DiffuseOcean:
       southernlimitmask = ma.masked_all(len(self.olon))
       olat_ext          = np.append(-82.1,self.olat)
       dfield_ext = ma.concatenate([ma.column_stack(southernlimitmask), datafield], 0)
+      # f = interp2d(self.olon, olat_ext, dfield_ext)
+      # return f(self.pismlon, self.pismlat)
       return interp(dfield_ext, self.olon, olat_ext, self.pismlon, self.pismlat)
+
 
     def run_diffuse(diffuse_var):
       #for diffuse_var in self.diffuse_vars:
